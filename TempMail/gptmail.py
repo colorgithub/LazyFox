@@ -349,3 +349,9 @@ class TempMail:
 
     def __enter__(self): return self                                                   # 进入 with 语句时返回自身
     def __exit__(self, *args): self.close()                                            # 退出 with 语句时自动清理
+    
+    
+if __name__ == "__main__":
+    with TempMail() as mail:
+        print(mail.generateEmail())
+        print(mail.listAll())
