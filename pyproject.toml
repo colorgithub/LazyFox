@@ -1,7 +1,23 @@
 [project]
 name = "lazyfox"
 version = "0.1.0"
-description = "LazyFox"
+description = "一个专为浏览器自动化与逆向场景打造的 Python 极速开发脚手架"
 readme = "README.md"
-requires-python = ">=3.13"
-dependencies = []
+requires-python = ">=3.12"
+license = { text = "AGPL-3.0" }
+authors = [
+    { name = "Kernyr", email = "917811726@qq.com" }
+]
+keywords = ["automation", "reverse-engineering", "playwright", "camoufox"]
+
+dependencies = [
+    "playwright>=1.40.0",
+    "camoufox>=0.2.0", 
+    "httpx>=0.25.0",
+    "curl-cffi>=0.5.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/kernel4632/LazyFox"
+Repository = "https://github.com/kernel4632/LazyFox"
+Issues = "https://github.com/kernel4632/LazyFox/issues"
