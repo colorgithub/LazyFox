@@ -1,0 +1,98 @@
+# ==============================
+# 1. Python 基础
+# ==============================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ==============================
+# 2. 虚拟环境与 uv
+# ==============================
+# uv 虚拟环境目录
+.venv/
+venv/
+ENV/
+env/
+.ENV
+
+# uv 缓存 (通常不需要提交，但如果你在项目根目录运行了 uv cache dir 指向这里)
+.uv-cache/
+
+# ==============================
+# 3. 浏览器与自动化工具
+# ==============================
+# Playwright 下载的浏览器文件 (通常很大，几百MB，不应提交)
+playwright-driver/
+playwright-build/
+playwright-local-registry/
+
+# Camoufox 相关数据与缓存
+.camoufox/
+camoufox-data/
+
+# 临时文件与日志
+*.log
+logs/
+output/
+screenshot*.png
+trace.zip
+
+# ==============================
+# 4. IDE 与编辑器
+# ==============================
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+*.iws
+.idea_modules/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# ==============================
+# 5. 系统与杂项
+# ==============================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# 项目敏感数据 (切勿提交账号密码等)
+.env
+.env.local
+*.secret
+config.yaml
+config.yml
