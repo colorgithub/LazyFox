@@ -8,7 +8,6 @@ import urllib.request                                                           
 import urllib.error                                                                    # urllib 异常库用于捕获 HTTP 错误
 import http.cookiejar                                                                  # CookieJar 用于保存浏览器会话 cookie
 
-
 """
 # 拿验证码
 with TempMail() as mail:
@@ -35,7 +34,21 @@ with TempMail() as mail:
 
 
 class TempMail:
-    """临时邮箱模块（适配 mail.chatgpt.org.uk）"""
+    """
+    TempMail 临时邮箱工具类
+
+    功能说明：
+        提供临时邮箱生成、收件箱管理和邮件内容提取功能，主要用于自动化测试中的
+        验证码/激活链接获取场景。
+
+    主要方法：
+        - generateEmail(): 生成新的临时邮箱地址
+        - getInbox(): 获取收件箱邮件列表
+        - getCode(): 自动等待并提取邮件中的验证码
+        - getLink(keyword): 自动等待并提取包含指定关键词的链接
+        - readMessage(mailID): 读取指定邮件的完整内容
+    """
+
 
     def __init__(self, apiUrl="https://mail.chatgpt.org.uk", verifySsl=False):
         self.apiUrl = apiUrl                                                           # 邮箱服务的根地址
