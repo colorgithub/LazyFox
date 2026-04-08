@@ -375,7 +375,6 @@ dependencies = [
     { name = "camoufox" },
     { name = "curl-cffi" },
     { name = "httpx" },
-    { name = "playwright" },
 ]
 
 [package.metadata]
@@ -383,7 +382,6 @@ requires-dist = [
     { name = "camoufox", specifier = ">=0.2.0" },
     { name = "curl-cffi", specifier = ">=0.5.0" },
     { name = "httpx", specifier = ">=0.25.0" },
-    { name = "playwright", specifier = ">=1.40.0" },
 ]
 
 [[package]]
