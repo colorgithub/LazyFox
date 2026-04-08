@@ -51,7 +51,6 @@ class Browser:
 
         print("Browser 初始化完成。")  # 初始化完成后打印，说明 Browser 已经准备好了
 
-
     # ==================== 生命周期管理 ====================
 
     def __enter__(self):
@@ -59,10 +58,8 @@ class Browser:
             self.start()
         return self  # 返回自己，外部自然使用 browser.click(...) 这样的写法
 
-
     def __exit__(self, excType, excValue, traceback):
         self.close()  # with 结束时自动关闭，保证资源释放
-
 
     def start(self):
         if self.isStarted and self.page is not None:  # 已经启动且 page 可用时，不重复启动
@@ -78,7 +75,6 @@ class Browser:
 
         self.log("Camoufox 启动完成，page 已创建。")
         return self
-
 
     def close(self) -> bool:
         self.log("正在关闭 Browser。")  # 关闭前打印日志，明确生命周期结束点
@@ -107,7 +103,6 @@ class Browser:
             self.log(f"close 失败：{error}")
             return False
 
-
     def ensurePage(self):
         if self.page is not None:  # 已经有 page 时直接返回，这是最常见路径
             return self.page
@@ -120,7 +115,6 @@ class Browser:
 
         return self.page
 
-
     # ==================== 基础工具 ====================
 
     def log(self, message: str):
@@ -129,19 +123,15 @@ class Browser:
 
         print(message)  # 调试模式下打印日志，便于看清整个动作链
 
-
     def sleep(self, seconds: float):
         self.log(f"等待 {seconds} 秒。")  # 主动说明程序为什么在等，避免“看起来像卡住”
         time.sleep(seconds)  # 真正执行等待
 
-
     def getPage(self):
         return self.ensurePage()  # 对外暴露 page，但仍然保证 page 一定已准备好
 
-
     def getTimeout(self, timeout: Optional[int], defaultValue: int) -> int:
         return timeout if timeout is not None else defaultValue  # 调用方有传就优先用传入值，没传才走默认值
-
 
     def getRetryCount(self, retryCount: Optional[int], actionName: str) -> int:
         if retryCount is not None:  # 调用方明确指定了重试次数时，优先尊重调用方
@@ -152,10 +142,8 @@ class Browser:
 
         return self.config.actionRetryCount  # 其他动作默认更保守一点
 
-
     def getRetryInterval(self, retryInterval: Optional[float]) -> float:
         return retryInterval if retryInterval is not None else self.config.retryInterval  # 没传就走统一默认间隔
-
 
     def hasSmartRule(
         self,
@@ -170,19 +158,20 @@ class Browser:
         retryCount: Optional[int] = None,
         retryInterval: Optional[float] = None,
     ) -> bool:
-        return any([  # 这里只判断“是否启用了增强规则”，不做任何页面动作
-            showSelector,  # 点击或输入后等某个元素出现
-            hideSelector,  # 点击或输入后等某个元素消失
-            urlContains,  # 地址包含某段文本
-            textContains,  # 页面文本包含某段内容
-            valueIs is not None,  # 输入框值等于目标值
-            countIs is not None,  # 元素数量正好等于目标数量
-            countAtLeast is not None,  # 元素数量至少达到目标数量
-            titleContains,  # 页面标题包含目标文本
-            retryCount is not None,  # 明确传了重试次数，也说明调用者希望走增强流程
-            retryInterval is not None,  # 明确传了重试间隔，也说明调用者希望走增强流程
-        ])
-
+        return any(
+            [  # 这里只判断“是否启用了增强规则”，不做任何页面动作
+                showSelector,  # 点击或输入后等某个元素出现
+                hideSelector,  # 点击或输入后等某个元素消失
+                urlContains,  # 地址包含某段文本
+                textContains,  # 页面文本包含某段内容
+                valueIs is not None,  # 输入框值等于目标值
+                countIs is not None,  # 元素数量正好等于目标数量
+                countAtLeast is not None,  # 元素数量至少达到目标数量
+                titleContains,  # 页面标题包含目标文本
+                retryCount is not None,  # 明确传了重试次数，也说明调用者希望走增强流程
+                retryInterval is not None,  # 明确传了重试间隔，也说明调用者希望走增强流程
+            ]
+        )
 
     # ==================== selector 统一处理 ====================
 
@@ -207,7 +196,6 @@ class Browser:
 
         return selector[0] if selector else None  # 都没判断出来时，退回第一个，保留原始意图
 
-
     def normalizeSelector(self, selector: Any, timeout: Optional[int] = None) -> str:
         bestSelector = self.getBestSelector(selector, timeout=timeout)  # 把字符串或候选列表都收束成一个真实要用的 selector
 
@@ -216,12 +204,10 @@ class Browser:
 
         return bestSelector
 
-
     def getLocator(self, selector: Any, timeout: Optional[int] = None):
         page = self.ensurePage()  # 每次拿 locator 前先保证 page 已可用
         selector = self.normalizeSelector(selector, timeout=timeout)  # 统一把 selector 处理成最终可用字符串
         return page.locator(selector).first  # 统一使用 first，避免匹配多个元素时行为不稳定
-
 
     # ==================== 页面状态与等待 ====================
 
@@ -233,7 +219,6 @@ class Browser:
             return state in ["interactive", "complete"]  # interactive 表示 DOM 可用了，complete 表示页面基本加载完
         except Exception:
             return False  # 读取失败时直接返回 False，让外层逻辑决定是否继续等
-
 
     def waitPageReady(self, timeout: Optional[int] = None) -> bool:
         timeout = self.getTimeout(timeout, self.config.waitTimeout)  # 没传 timeout 就用统一 wait 默认值
@@ -250,7 +235,6 @@ class Browser:
 
         self.log("等待页面可操作状态超时。")
         return False
-
 
     def has(
         self,
@@ -270,10 +254,8 @@ class Browser:
         except Exception:
             return False  # 判断类方法返回布尔值更好用，不抛异常
 
-
     def show(self, selector: Any, timeout: Optional[int] = None) -> bool:
         return self.has(selector, state="visible", timeout=timeout)  # show 本质上就是“元素可见”
-
 
     def wait(
         self,
@@ -322,7 +304,6 @@ class Browser:
         self.log("wait 超时。")
         return False
 
-
     def count(self, selector: Any) -> int:
         if not selector:  # 没 selector 没法统计
             self.log("count 失败：selector 为空。")
@@ -335,7 +316,6 @@ class Browser:
             return page.locator(selector).count()  # 直接返回命中数量
         except Exception:
             return 0  # 统计失败时返回 0，更适合自动化流程里的条件判断
-
 
     def getText(
         self,
@@ -359,7 +339,6 @@ class Browser:
         except Exception:
             return defaultValue
 
-
     def getValue(
         self,
         selector: Any,
@@ -379,7 +358,6 @@ class Browser:
             return self.getLocator(selector, timeout=timeout).input_value(timeout=timeout)  # input_value 专门用于取输入框值
         except Exception:
             return defaultValue
-
 
     def getHtml(
         self,
@@ -404,7 +382,6 @@ class Browser:
         except Exception:
             return defaultValue
 
-
     def isChecked(self, selector: Any, timeout: Optional[int] = None) -> bool:
         timeout = self.getTimeout(timeout, self.config.resultTimeout)  # 勾选状态判断前先短等元素出现
 
@@ -416,7 +393,6 @@ class Browser:
         except Exception:
             return False
 
-
     def isDisabled(self, selector: Any, timeout: Optional[int] = None) -> bool:
         timeout = self.getTimeout(timeout, self.config.resultTimeout)  # 禁用状态判断前先短等元素出现
 
@@ -427,7 +403,6 @@ class Browser:
             return self.getLocator(selector, timeout=timeout).is_disabled(timeout=timeout)  # 交给底层判断是否禁用
         except Exception:
             return False
-
 
     def find(self, selector: Any, timeout: Optional[int] = None):
         if not selector:  # 没 selector 就没法找元素
@@ -445,7 +420,6 @@ class Browser:
         except Exception as error:
             self.log(f"find 失败：{error}")
             return None
-
 
     # ==================== 统一结果判定引擎 ====================
 
@@ -523,7 +497,6 @@ class Browser:
         self.log("结果检查未通过。")
         return False
 
-
     def makeSure(
         self,
         selector: Optional[Any] = None,
@@ -549,7 +522,6 @@ class Browser:
             titleContains=titleContains,
             timeout=timeout,
         )
-
 
     def runAction(
         self,
@@ -605,7 +577,6 @@ class Browser:
 
         self.log(f"{actionName} 已达到最大尝试次数，但仍未成功。")
         return False
-
 
     # ==================== 页面导航类 ====================
 
@@ -667,7 +638,6 @@ class Browser:
             resultTimeout=timeout,
         )
 
-
     def reload(
         self,
         timeout: Optional[int] = None,
@@ -722,7 +692,7 @@ class Browser:
             retryInterval=retryInterval,
             resultTimeout=timeout,
         )
-        
+
     def back(
         self,
         timeout: Optional[int] = None,
@@ -731,42 +701,73 @@ class Browser:
         retryCount: Optional[int] = None,
         retryInterval: Optional[float] = None,
     ) -> bool:
-        page = self.ensurePage()  # 后退前先确保 page 可用
-        timeout = self.getTimeout(timeout, self.config.gotoTimeout)
-        isSmart = self.hasSmartRule(
-            showSelector=showSelector,
-            urlContains=urlContains,
-            retryCount=retryCount,
-            retryInterval=retryInterval,
-        )
+        page = self.ensurePage()  # 执行后退前先确保 page 可用
+        timeout = self.getTimeout(timeout, self.config.gotoTimeout)  # 后退沿用导航类超时更合理
+        retryCount = self.getRetryCount(retryCount, "back")  # 统一拿重试次数
+        retryInterval = self.getRetryInterval(retryInterval)  # 统一拿重试间隔
 
-        self.log("正在执行后退。")
+        self.log("正在执行后退。")  # 打印当前动作，方便控制台排查
 
-        def action():
+        for index in range(retryCount + 1):
+            attempt = index + 1  # 把 0 开始的索引转成人类更直观的次数
+            beforeUrl = page.url  # 记录动作前地址，这是 back 是否真的生效的关键依据
+
+            self.log(f"back 第 {attempt} 次尝试开始，当前地址：{beforeUrl}")  # 打印动作前地址，方便后面判断变化
+
             try:
-                page.go_back(timeout=timeout)  # 执行后退动作
+                page.go_back(timeout=min(timeout, 5000), wait_until="domcontentloaded")  # 先用原生后退，等待策略用更宽松的 domcontentloaded
             except Exception as error:
-                self.log(f"back 底层调用报错，但继续检查页面状态：{error}")  # 后退动作超时不一定代表状态没变
-            self.waitPageReady(timeout=min(timeout, self.config.waitTimeout))  # 后退后统一等页面可操作
+                self.log(f"原生 go_back 报错，准备继续检查或兜底：{error}")  # go_back 报错不代表一定没生效，所以先不直接判死
 
-        if not isSmart:
-            try:
-                action()
-                self.log("后退完成。")
-                return True
-            except Exception as error:
-                self.log(f"back 失败：{error}")
+            isChanged = self.waitUrlChange(beforeUrl, timeout=4000)  # 先看地址有没有真的变化
+
+            if not isChanged:
+                self.log("原生 go_back 后地址未变化，尝试使用 history.back() 兜底。")  # 原生后退没效果时，改用 JS 历史后退再试一次
+
+                try:
+                    page.evaluate("history.back()")  # 用浏览器原生历史栈做一次 JS 层面的后退兜底
+                except Exception as error:
+                    self.log(f"history.back() 执行失败：{error}")  # 兜底失败也只记日志，不立刻中断
+
+                isChanged = self.waitUrlChange(beforeUrl, timeout=4000)  # JS 后退后再看一次地址是否变化
+
+            self.waitPageReady(timeout=min(timeout, self.config.waitTimeout))  # 无论是否变化，都等一下页面进入可操作状态
+
+            currentUrl = page.url  # 记录动作后地址，方便日志和最终判断
+            self.log(f"back 第 {attempt} 次尝试后当前地址：{currentUrl}")  # 打印动作后地址，便于定位为什么没成功
+
+            # 先判断是否真的发生了导航变化。  # back 的本质不是“某个元素在不在”，而是历史位置有没有变
+            if not isChanged:
+                if attempt <= retryCount:
+                    self.log(f"back 第 {attempt} 次没有产生地址变化，等待 {retryInterval} 秒后重试。")
+                    time.sleep(retryInterval)
+                    continue
+
+                self.log("back 已达到最大尝试次数，但页面地址始终没有变化。")
                 return False
 
-        return self.runAction(
-            actionName="back",
-            actionFunc=action,
-            showSelector=showSelector,
-            urlContains=urlContains,
-            retryCount=retryCount,
-            retryInterval=retryInterval,
-            resultTimeout=max(self.config.resultTimeout, 4000),  # 后退比普通动作更适合给更长一点结果判断时间
-        )
+            # 地址变化后，再检查目标页面是否符合预期。  # 只有“变了”还不够，还要“变对了”
+            isTargetOk = self.isSmartSuccess(
+                showSelector=showSelector,
+                urlContains=urlContains,
+                timeout=max(self.config.resultTimeout, 4000),  # back 后页面恢复可能比普通动作慢一点，所以给更长结果判断时间
+            )
+
+            # 没传 showSelector/urlContains 时，只要地址变了就算成功。  # 这是最自然的 back 语义
+            if not showSelector and not urlContains:
+                self.log(f"back 第 {attempt} 次尝试成功：页面地址已经变化。")
+                return True
+
+            if isTargetOk:
+                self.log(f"back 第 {attempt} 次尝试成功：页面已经回到目标状态。")
+                return True
+
+            if attempt <= retryCount:
+                self.log(f"back 第 {attempt} 次地址已变化，但目标状态未达成，等待 {retryInterval} 秒后重试。")
+                time.sleep(retryInterval)
+
+        self.log("back 已达到最大尝试次数，但仍未到达目标页面。")
+        return False
 
     def forward(
         self,
@@ -776,42 +777,70 @@ class Browser:
         retryCount: Optional[int] = None,
         retryInterval: Optional[float] = None,
     ) -> bool:
-        page = self.ensurePage()  # 前进前先确保 page 可用
-        timeout = self.getTimeout(timeout, self.config.gotoTimeout)
-        isSmart = self.hasSmartRule(
-            showSelector=showSelector,
-            urlContains=urlContains,
-            retryCount=retryCount,
-            retryInterval=retryInterval,
-        )
+        page = self.ensurePage()  # 执行前进前先确保 page 可用
+        timeout = self.getTimeout(timeout, self.config.gotoTimeout)  # 前进也属于导航动作
+        retryCount = self.getRetryCount(retryCount, "forward")  # 统一拿重试次数
+        retryInterval = self.getRetryInterval(retryInterval)  # 统一拿重试间隔
 
-        self.log("正在执行前进。")
+        self.log("正在执行前进。")  # 打印当前动作
 
-        def action():
+        for index in range(retryCount + 1):
+            attempt = index + 1  # 人类直觉式尝试次数
+            beforeUrl = page.url  # 记录动作前地址，用来判断 forward 是否真的发生了变化
+
+            self.log(f"forward 第 {attempt} 次尝试开始，当前地址：{beforeUrl}")  # 打印动作前状态
+
             try:
-                page.go_forward(timeout=timeout)  # 执行前进动作
+                page.go_forward(timeout=min(timeout, 5000), wait_until="domcontentloaded")  # 先用原生前进
             except Exception as error:
-                self.log(f"forward 底层调用报错，但继续检查页面状态：{error}")  # 即使前进报错，也继续看页面状态
-            self.waitPageReady(timeout=min(timeout, self.config.waitTimeout))  # 前进后统一等页面稳定
+                self.log(f"原生 go_forward 报错，准备继续检查或兜底：{error}")  # 原生前进报错时，不立刻判死
 
-        if not isSmart:
-            try:
-                action()
-                self.log("前进完成。")
-                return True
-            except Exception as error:
-                self.log(f"forward 失败：{error}")
+            isChanged = self.waitUrlChange(beforeUrl, timeout=4000)  # 先看地址有没有变化
+
+            if not isChanged:
+                self.log("原生 go_forward 后地址未变化，尝试使用 history.forward() 兜底。")  # 原生前进没变化时，尝试 JS 兜底
+
+                try:
+                    page.evaluate("history.forward()")  # 使用浏览器历史前进作为兜底方式
+                except Exception as error:
+                    self.log(f"history.forward() 执行失败：{error}")
+
+                isChanged = self.waitUrlChange(beforeUrl, timeout=4000)  # JS 前进后再次判断地址变化
+
+            self.waitPageReady(timeout=min(timeout, self.config.waitTimeout))  # 等页面进入可操作状态
+
+            currentUrl = page.url  # 记录动作后地址
+            self.log(f"forward 第 {attempt} 次尝试后当前地址：{currentUrl}")  # 打印动作后状态
+
+            if not isChanged:
+                if attempt <= retryCount:
+                    self.log(f"forward 第 {attempt} 次没有产生地址变化，等待 {retryInterval} 秒后重试。")
+                    time.sleep(retryInterval)
+                    continue
+
+                self.log("forward 已达到最大尝试次数，但页面地址始终没有变化。")
                 return False
 
-        return self.runAction(
-            actionName="forward",
-            actionFunc=action,
-            showSelector=showSelector,
-            urlContains=urlContains,
-            retryCount=retryCount,
-            retryInterval=retryInterval,
-            resultTimeout=max(self.config.resultTimeout, 4000),
-        )
+            isTargetOk = self.isSmartSuccess(
+                showSelector=showSelector,
+                urlContains=urlContains,
+                timeout=max(self.config.resultTimeout, 4000),  # 导航后给稍长一点结果判断时间
+            )
+
+            if not showSelector and not urlContains:
+                self.log(f"forward 第 {attempt} 次尝试成功：页面地址已经变化。")
+                return True
+
+            if isTargetOk:
+                self.log(f"forward 第 {attempt} 次尝试成功：页面已经到达目标状态。")
+                return True
+
+            if attempt <= retryCount:
+                self.log(f"forward 第 {attempt} 次地址已变化，但目标状态未达成，等待 {retryInterval} 秒后重试。")
+                time.sleep(retryInterval)
+
+        self.log("forward 已达到最大尝试次数，但仍未到达目标页面。")
+        return False
 
     def openPage(self, url: Optional[str] = None, showSelector: Optional[Any] = None) -> bool:
         if not url:  # 不传 url 时，只表示确认 page 是否可用
@@ -820,7 +849,6 @@ class Browser:
             return hasPage
 
         return self.goto(url, showSelector=showSelector)  # 传了 url 时，openPage 就是一次更人话的 goto
-
 
     # ==================== 元素动作类 ====================
 
@@ -845,7 +873,6 @@ class Browser:
             pass
 
         locator.evaluate("node => node.click()")  # 第三层 JS 点击，作为最后保底方案
-
 
     def click(
         self,
@@ -923,7 +950,6 @@ class Browser:
             retryInterval=retryInterval,
         )
 
-
     def dblclick(
         self,
         selector: Any,
@@ -969,7 +995,6 @@ class Browser:
             retryInterval=retryInterval,
         )
 
-
     def hover(
         self,
         selector: Any,
@@ -1014,7 +1039,6 @@ class Browser:
             retryCount=retryCount,
             retryInterval=retryInterval,
         )
-
 
     def fill(
         self,
@@ -1076,7 +1100,6 @@ class Browser:
             retryInterval=retryInterval,
         )
 
-
     def type(
         self,
         selector: Any,
@@ -1136,7 +1159,6 @@ class Browser:
             retryCount=retryCount,
             retryInterval=retryInterval,
         )
-
 
     def press(
         self,
@@ -1202,7 +1224,6 @@ class Browser:
             retryInterval=retryInterval,
         )
 
-
     def check(
         self,
         selector: Any,
@@ -1251,7 +1272,6 @@ class Browser:
             retryCount=retryCount,
             retryInterval=retryInterval,
         )
-
 
     def uncheck(
         self,
@@ -1302,7 +1322,6 @@ class Browser:
             retryInterval=retryInterval,
         )
 
-
     def select(
         self,
         selector: Any,
@@ -1348,7 +1367,6 @@ class Browser:
             retryCount=retryCount,
             retryInterval=retryInterval,
         )
-
 
     def setInputFiles(
         self,
@@ -1408,7 +1426,6 @@ class Browser:
             retryInterval=retryInterval,
         )
 
-
     def focus(self, selector: Any, timeout: Optional[int] = None) -> bool:
         if not selector:
             self.log("focus 失败：selector 为空。")
@@ -1428,7 +1445,6 @@ class Browser:
         except Exception as error:
             self.log(f"focus 失败：{error}")
             return False
-
 
     def blur(self, selector: Any, timeout: Optional[int] = None, showSelector: Optional[Any] = None) -> bool:
         if not selector:
@@ -1461,7 +1477,6 @@ class Browser:
             showSelector=showSelector,
         )
 
-
     def scroll(self, selector: Optional[Any] = None, position: Optional[str] = None) -> bool:
         page = self.ensurePage()  # 滚动前确保 page 可用
         self.log("正在执行滚动。")
@@ -1489,7 +1504,6 @@ class Browser:
         except Exception as error:
             self.log(f"滚动失败：{error}")
             return False
-
 
     # ==================== 脚本、截图、调试类 ====================
 
@@ -1520,7 +1534,6 @@ class Browser:
             self.log(f"screenshot 失败：{error}")
             return ""
 
-
     def evaluate(self, script: str, arg: Any = None, defaultValue: Any = None) -> Any:
         if not script:
             self.log("evaluate 失败：script 为空。")
@@ -1536,7 +1549,6 @@ class Browser:
         except Exception as error:
             self.log(f"evaluate 失败：{error}")
             return defaultValue
-
 
     def remove(self, selector: Any, timeout: Optional[int] = None) -> bool:
         if not selector:
@@ -1560,8 +1572,31 @@ class Browser:
             self.log(f"remove 失败：{error}")
             return False
 
+    def waitUrlChange(self, oldUrl: str, timeout: Optional[int] = None) -> bool:
+        timeout = self.getTimeout(timeout, self.config.waitTimeout)  # 没传超时就走默认等待时间
+        endTime = time.time() + timeout / 1000  # 统一换算成结束时间，便于轮询判断
 
+        self.log(f"正在等待页面地址变化，旧地址是：{oldUrl}")  # 打印旧地址，方便观察 back/forward 是否真的发生了变化
 
+        while time.time() < endTime:
+            try:
+                currentUrl = self.ensurePage().url  # 每轮都读取当前地址，判断是否已经不同
+                if currentUrl != oldUrl:
+                    self.log(f"页面地址已变化：{oldUrl} -> {currentUrl}")  # 地址真的变了时明确打日志
+                    return True
+            except Exception:
+                pass  # 某次读取失败时先忽略，继续轮询，不让瞬时异常打断整体判断
+
+            time.sleep(0.2)  # 每轮稍等一点，给导航动作落地时间
+
+        self.log("等待页面地址变化超时。")  # 超时后说明 back/forward 很可能没有真正生效
+        return False
+
+    def hasUrlChanged(self, oldUrl: str) -> bool:
+        try:
+            return self.ensurePage().url != oldUrl  # 只要当前地址和旧地址不同，就说明页面位置变了
+        except Exception:
+            return False  # 读取失败时直接按没变处理，更稳一些
 
 
 if __name__ == "__main__":
@@ -1569,26 +1604,21 @@ if __name__ == "__main__":
     import tempfile  # 用来临时创建一个上传文件，便于测试 setInputFiles
     from pathlib import Path  # 处理测试文件路径更清楚
 
-
     def printTitle(title: str):
         print("\n" + "=" * 80)  # 大分隔线，方便控制台阅读
         print(title)  # 打印阶段标题
         print("=" * 80)
 
-
     def printStep(name: str):
         print(f"\n--- {name} ---")  # 每个测试项单独一段，更容易定位失败位置
-
 
     def assertTrue(value: bool, message: str):
         if not value:  # 条件不成立时直接抛异常，让当前测试明确失败
             raise AssertionError(message)
 
-
     def assertEqual(left, right, message: str):
         if left != right:  # 值不相等时抛异常，并带上左右值，方便排查
             raise AssertionError(f"{message} | left={left!r}, right={right!r}")
-
 
     def runTest(testName: str, testFunc, testResults: list):
         printStep(testName)  # 先打印当前测试名字，控制台更友好
@@ -1606,7 +1636,6 @@ if __name__ == "__main__":
         except Exception as error:
             print(f"[FAIL] {testName} -> {error}")  # 捕获异常但不中断整个测试流程
             testResults.append((testName, False))
-
 
     printTitle("Browser 全面测试开始")  # 整个测试开始时打印大标题
 
@@ -1686,13 +1715,13 @@ if __name__ == "__main__":
                 lambda: assertTrue(browser.back(showSelector="#app", urlContains="browser_test_page1.html"), "回到 page1 失败"),
                 testResults,
             )
-            
+
             runTest(
                 "恢复到 page1",
                 lambda: assertTrue(browser.goto(page1Url, showSelector="#app"), "恢复到 page1 失败"),
                 testResults,
             )
-            
+
             # ===== 读取与判断类 =====
 
             runTest("has 可见元素", lambda: assertTrue(browser.has("#app"), "has 失败"), testResults)
@@ -1720,7 +1749,7 @@ if __name__ == "__main__":
                 lambda: assertTrue(browser.makeSure(titleContains="Browser Test Page One"), "makeSure titleContains 失败"),
                 testResults,
             )
-            
+
             runTest(
                 "动作测试前恢复到 page1",
                 lambda: assertTrue(browser.goto(page1Url, showSelector="#app"), "动作测试前恢复到 page1 失败"),
@@ -1872,7 +1901,7 @@ if __name__ == "__main__":
                 lambda: assertTrue(browser.click("#showHiddenButton", showSelector="#hiddenTarget"), "hiddenTarget 未出现"),
                 testResults,
             )
-            
+
             runTest(
                 "高级测试前恢复到 page1",
                 lambda: assertTrue(browser.goto(page1Url, showSelector="#app"), "高级测试前恢复到 page1 失败"),
@@ -1901,10 +1930,7 @@ if __name__ == "__main__":
 
             runTest(
                 "screenshot",
-                lambda: assertTrue(
-                    os.path.exists(browser.screenshot(path=str(tempDir / "quick-test-shot.png"), showSelector="#app")),
-                    "screenshot 文件不存在"
-                ),
+                lambda: assertTrue(os.path.exists(browser.screenshot(path=str(tempDir / "quick-test-shot.png"), showSelector="#app")), "screenshot 文件不存在"),
                 testResults,
             )
 
