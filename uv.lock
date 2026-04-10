@@ -599,6 +599,7 @@ dependencies = [
     { name = "camoufox", extra = ["geoip"] },
     { name = "curl-cffi" },
     { name = "httpx" },
+    { name = "playwright" },
     { name = "websocket-client" },
 ]
 
@@ -607,6 +608,7 @@ requires-dist = [
     { name = "camoufox", extras = ["geoip"], specifier = ">=0.2.0" },
     { name = "curl-cffi", specifier = ">=0.5.0" },
     { name = "httpx", specifier = ">=0.25.0" },
+    { name = "playwright", specifier = ">=1.58.0" },
     { name = "websocket-client", specifier = ">=1.9.0" },
 ]
 
