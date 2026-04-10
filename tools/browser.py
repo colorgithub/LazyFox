@@ -1679,22 +1679,6 @@ class Browser:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 if __name__ == "__main__":
     import os  # 用来判断截图文件和上传测试文件是否存在
     import tempfile  # 用来临时创建一个上传文件，便于测试 setInputFiles

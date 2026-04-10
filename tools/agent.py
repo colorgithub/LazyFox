@@ -449,7 +449,7 @@ if __name__ == "__main__":
     print("测试目标:", testGoal)                                                       # 打印测试目标方便核对
 
     try:
-        with Agent(headless=False) as agent:                                           # 启动真实浏览器进行 UI 测试
+        with Agent(engine="playwright",headless=False) as agent:                                           # 启动真实浏览器进行 UI 测试
             print("[1] 打开首页...")                                                   # 测试步骤 1：打开首页
             ok = agent.openHome()                                                      # 打开 Gemini Browser 首页
             print("openHome:", ok)                                                     # 输出首页打开结果
@@ -466,6 +466,9 @@ if __name__ == "__main__":
             print("waitPageStable:", ok1)                                              # 输出页面稳定结果
             print("waitHumanCheckSettle:", ok2)                                        # 输出验证稳定结果
             if not ok1 or not ok2: raise RuntimeError("页面或人机验证未稳定")           # 任一失败则中止测试
+            
+            print("\n[!] 程序已暂停，请手动操作浏览器。操作完成后，请在此终端按回车键继续...")
+            input()  # 程序将在此处阻塞，直到用户按下回车
 
             print("[4] 提交目标任务...")                                               # 测试步骤 4：切模型、填输入框、点击 Run
             ok = agent.submitGoal(testGoal)                                            # 一次性完成任务提交流程
