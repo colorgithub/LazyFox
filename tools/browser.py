@@ -1,15 +1,152 @@
 """
-这个文件提供一个更智能、更适合业务直接调用的 Browser 类。  # 文件作用：这是统一浏览器入口，外部只需要 import Browser 就能直接用
+Browser 类 - 智能浏览器自动化工具
 
-设计目标：  # 这里明确这个类存在的原因，方便后面维护时不跑偏
-1. 内部组合 Camoufox 或 Playwright Chromium，而不是继承它们。  # 因为底层都更适合作为被托管资源，而不是业务直接继承
-2. 自动创建并管理 page。  # 调用方不需要自己 new_page
-3. 保留直觉式方法名。  # 比如 click、fill、goto，不发明一堆新 API
-4. 当传入增强参数时自动进入智能模式。  # 比如 click(..., showSelector="...") 会自动重试和校验
-5. 支持 selector 是字符串，也支持 selector 是候选列表。  # 这很适合真实项目里不稳定的页面结构
-6. 支持 engine="camoufox" 或 engine="playwright"。  # 方便在不同站点风控条件下切换底层浏览器引擎
+这是一个统一的浏览器自动化入口，封装了 Camoufox 和 Playwright Chromium 两种浏览器引擎，
+提供了更智能、更适合业务直接调用的 API。
+
+【基本用法】
+```python
+from browser import Browser
+
+# 方式1：使用 with 语句（推荐）
+with Browser(engine="playwright", headless=False) as browser:
+    browser.goto("https://example.com")
+    browser.click("#button")
+    # 使用完毕自动关闭
+
+# 方式2：手动管理
+browser = Browser(engine="camoufox")
+try:
+    browser.goto("https://example.com")
+    browser.fill("#input", "text")
+finally:
+    browser.close()
+```
+
+【配置选项】
+BrowserConfig 类提供了以下可配置项：
+- clickRetryCount: 点击动作默认重试次数（默认3）
+- actionRetryCount: 非点击动作默认重试次数（默认2）
+- retryInterval: 重试间隔秒数（默认1.0）
+- actionTimeout: 普通动作超时毫秒（默认8000）
+- resultTimeout: 动作后等待结果超时毫秒（默认2500）
+- gotoTimeout: 打开页面超时毫秒（默认30000）
+- waitTimeout: wait方法默认超时毫秒（默认10000）
+- typeDelay: 逐字输入间隔毫秒（默认80）
+- isDebug: 是否打印调试日志（默认True）
+- engine: 浏览器引擎 "camoufox" 或 "playwright"（默认"camoufox"）
+- headless: 是否无头运行（默认False）
+- viewportWidth: 视口宽度（默认1440）
+- viewportHeight: 视口高度（默认900）
+- userAgent: 自定义UA字符串（默认空）
+
+【主要方法】
+1. 生命周期管理
+   - start(): 启动浏览器
+   - close(): 关闭浏览器
+   - getPage(): 获取当前页面对象
+
+2. 页面导航
+   - goto(url, **kwargs): 打开URL
+   - reload(**kwargs): 刷新页面
+   - back(**kwargs): 后退
+   - forward(**kwargs): 前进
+
+3. 元素操作
+   - click(selector, **kwargs): 点击元素
+   - fill(selector, value, **kwargs): 填写输入框
+   - type(selector, value, **kwargs): 逐字输入
+   - press(selector, key, **kwargs): 按键
+   - check(selector, **kwargs): 勾选复选框
+   - uncheck(selector, **kwargs): 取消勾选
+   - select(selector, value, **kwargs): 下拉选择
+   - hover(selector, **kwargs): 鼠标悬停
+   - dblclick(selector, **kwargs): 双击
+   - focus(selector, **kwargs): 聚焦元素
+   - blur(selector, **kwargs): 失焦
+   - scroll(selector=None, position=None): 滚动页面
+   - remove(selector, **kwargs): 移除元素
+   - setInputFiles(selector, filePath, **kwargs): 上传文件
+
+4. 元素查询
+   - has(selector, **kwargs): 判断元素是否存在
+   - show(selector, **kwargs): 判断元素是否可见
+   - wait(selector, **kwargs): 等待元素满足条件
+   - find(selector, **kwargs): 查找元素
+   - count(selector): 统计元素数量
+   - getText(selector, **kwargs): 获取文本
+   - getValue(selector, **kwargs): 获取输入框值
+   - getHtml(selector, **kwargs): 获取HTML
+   - isChecked(selector, **kwargs): 判断是否勾选
+   - isDisabled(selector, **kwargs): 判断是否禁用
+
+5. 智能操作（支持自动重试和结果验证）
+   所有操作方法都支持以下智能参数：
+   - showSelector: 等待指定元素出现
+   - hideSelector: 等待指定元素消失
+   - urlContains: 等待URL包含指定文本
+   - textContains: 等待页面包含指定文本
+   - valueIs: 等待输入框值等于指定值
+   - countIs: 等待元素数量等于指定值
+   - countAtLeast: 等待元素数量至少达到指定值
+   - titleContains: 等待页面标题包含指定文本
+   - retryCount: 自定义重试次数
+   - retryInterval: 自定义重试间隔
+
+6. 工具方法
+   - screenshot(path=None, **kwargs): 截图
+   - evaluate(script, arg=None): 执行JavaScript
+   - sleep(seconds): 等待指定秒数
+   - log(message): 打印日志
+
+【示例】
+```python
+# 基础操作
+browser.goto("https://example.com")
+browser.fill("#username", "admin")
+browser.fill("#password", "123456")
+browser.click("#login", showSelector="#dashboard")  # 点击后等待dashboard出现
+
+# 智能重试
+browser.click("#submit", 
+              showSelector="#success",  # 等待成功提示出现
+              retryCount=3,             # 最多重试3次
+              retryInterval=1.0)        # 每次间隔1秒
+
+# 元素查询
+if browser.has("#notification"):
+    text = browser.getText("#notification")
+    print(f"通知内容: {text}")
+
+# 处理不稳定的选择器
+browser.click(["#button1", ".btn-primary", "[role='button']"])  # 自动尝试多个选择器
+
+# 等待条件
+browser.wait("#loading", state="hidden")  # 等待加载动画消失
+browser.wait(".item", countAtLeast=5)     # 等待至少5个item出现
+
+# 截图
+browser.screenshot("screenshot.png")
+
+# 执行JS
+title = browser.evaluate("() => document.title")
+```
+
+【返回值说明】
+- 操作类方法（click、fill等）：成功返回True，失败返回False
+- 查询类方法（has、getText等）：返回查询结果或默认值
+- 等待类方法（wait）：条件满足返回True，超时返回False
+- getPage(): 返回页面对象
+- screenshot(): 返回截图文件路径
+- evaluate(): 返回JS执行结果
+
+【注意事项】
+1. 使用with语句可以自动管理浏览器生命周期
+2. 智能模式下会自动重试，适合处理不稳定的页面
+3. 选择器支持字符串或列表，列表会自动尝试直到找到可用选择器
+4. 所有超时参数单位为毫秒
+5. 默认开启调试日志，可通过isDebug=False关闭
 """
-
 from dataclasses import dataclass                                                     # dataclass 用来保存配置，结构简单清楚
 from typing import Any, Optional                                                      # 这里只保留常见类型提示，避免复杂度过高
 import time                                                                           # 用于短暂 sleep 和重试间隔
