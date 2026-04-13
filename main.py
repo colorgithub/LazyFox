@@ -16,7 +16,7 @@ import json
 import re
 import time
 
-from TempMail.emailnator import TempMail
+from TempMail.gptmail import TempMail
 from tools.browser import Browser
 from tools.identity import Identity
 from tools.log import Log
@@ -208,27 +208,12 @@ class DeepSeekRegister:
         logger.warning("邮件内容里没有提取到验证码。")
         return ""
 
-    def getMailSubject(self, mailItem):
-        return str(mailItem.get("subject", ""))
-
-    def getMailId(self, mailItem):
-        return str(mailItem.get("mailID") or mailItem.get("messageID") or "")
-
-    def getLatestMail(self, mail):
-        logger.info("正在读取最新邮件。")
-        mailList = mail.listAll()
-
-        if not mailList:
-            return None
-
-        return mailList[0]
-
     def readVerifyCodeFromMail(self, mailItem, mail):
         if not mailItem:
             return ""
 
-        subjectText = self.getMailSubject(mailItem)
-        messageId = self.getMailId(mailItem)
+        subjectText = str(mailItem.get("subject", ""))
+        messageId = str(mailItem.get("mailID", ""))
         bodyText = mail.readMessage(messageId)
         fullText = subjectText + "\n" + bodyText
 
@@ -243,10 +228,10 @@ class DeepSeekRegister:
         latestMailFingerprint = ""
 
         while time.time() - startTime < timeoutSeconds:
-            latestMail = self.getLatestMail(mail)
+            latestMail = mail.getLatestMail()
 
             if latestMail:
-                latestFingerprint = self.getMailId(latestMail)
+                latestFingerprint = str(latestMail.get("mailID", ""))
 
                 if latestFingerprint != latestMailFingerprint:
                     latestMailFingerprint = latestFingerprint
@@ -396,7 +381,7 @@ class DeepSeekRegister:
 
             with Browser(
                 engine="camoufox",
-                # headless=True,
+                headless=True,
                 os="windows",
                 geoip=True,
                 humanize=False,
