@@ -16,7 +16,7 @@ import json
 import re
 import time
 
-from TempMail.gptmail import TempMail
+from TempMail.emailnator import TempMail
 from tools.browser import Browser
 from tools.identity import Identity
 from tools.log import Log
@@ -208,34 +208,63 @@ class DeepSeekRegister:
         logger.warning("邮件内容里没有提取到验证码。")
         return ""
 
+    def getMailSubject(self, mailItem):
+        return str(mailItem.get("subject", ""))
+
+    def getMailId(self, mailItem):
+        return str(mailItem.get("mailID") or mailItem.get("messageID") or "")
+
+    def getLatestMail(self, mail):
+        logger.info("正在读取最新邮件。")
+        mailList = mail.listAll()
+
+        if not mailList:
+            return None
+
+        return mailList[0]
+
+    def readVerifyCodeFromMail(self, mailItem, mail):
+        if not mailItem:
+            return ""
+
+        subjectText = self.getMailSubject(mailItem)
+        messageId = self.getMailId(mailItem)
+        bodyText = mail.readMessage(messageId)
+        fullText = subjectText + "\n" + bodyText
+
+        logger.info(f"正在检查邮件，主题: {subjectText}")
+        return self.extractVerifyCode(fullText)
+
     def waitVerifyCode(self, mail):
         logger.info("正在等待邮箱验证码。")
         startTime = time.time()
         timeoutSeconds = 120
         pollSeconds = 2
+        latestMailFingerprint = ""
 
         while time.time() - startTime < timeoutSeconds:
-            newMail = mail.waitNewMail(timeoutSeconds=pollSeconds, pollSeconds=1)
+            latestMail = self.getLatestMail(mail)
 
-            if not newMail:
-                logger.info("暂时还没有新邮件，继续等待。")
-                continue
+            if latestMail:
+                latestFingerprint = self.getMailId(latestMail)
 
-            subjectText = str(newMail.get("subject", ""))
-            messageId = str(newMail.get("mailID", ""))
-            bodyText = mail.readMessage(messageId)
-            fullText = subjectText + "\n" + bodyText
+                if latestFingerprint != latestMailFingerprint:
+                    latestMailFingerprint = latestFingerprint
+                    code = self.readVerifyCodeFromMail(latestMail, mail)
 
-            logger.info(f"已收到新邮件，主题: {subjectText}")
-            code = self.extractVerifyCode(fullText)
+                    if code:
+                        logger.info(f"邮箱验证码获取完成: {code}")
+                        return code
 
-            if code:
-                logger.info(f"邮箱验证码获取完成: {code}")
-                return code
+                    logger.warning("最新邮件存在，但暂时没有提取到验证码，继续等待。")
+                else:
+                    logger.info("最新邮件和上一轮相同，继续等待新验证码邮件。")
+            else:
+                logger.info("暂时还没有读取到任何邮件，继续等待。")
 
-            logger.warning("这封新邮件没有提取到验证码，继续等待下一封。")
+            time.sleep(pollSeconds)
 
-        raise RuntimeError("邮箱验证码获取失败，请检查临时邮箱服务或验证码邮件内容格式。")
+        raise RuntimeError("邮箱验证码获取失败，请检查临时邮箱服务、验证码投递状态或邮件内容格式。")
 
     def submitRegisterForm(self, browser, code):
         logger.info("正在填写验证码并提交注册。")
@@ -420,7 +449,7 @@ def runRegisterFlow(accountCount=1):
 if __name__ == "__main__":
     startTime = time.time()
     logger.info("deepseek 注册流程启动")
-    runRegisterFlow(accountCount=4)
+    runRegisterFlow(accountCount=1)
     endTime = time.time()
     duration = endTime - startTime
     logger.info(f"注册进程完成，耗时 {duration:.2f} 秒")
