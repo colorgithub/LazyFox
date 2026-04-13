@@ -64,11 +64,18 @@ class TempMail:
         self.sslContext = (                                                            # 创建 SSL 上下文对象
             ssl.create_default_context() if self.verifySsl else ssl._create_unverified_context()
         )
-        self.opener = urllib.request.build_opener(                                     # 创建带 cookie 和 HTTPS 支持的浏览器 opener
-            urllib.request.ProxyHandler(),                                             # 使用系统代理设置
-            urllib.request.HTTPSHandler(context=self.sslContext),                      # 绑定 HTTPS 上下文
-            urllib.request.HTTPCookieProcessor(self.cookieJar),                        # 自动处理 cookie
-        )
+        self.openers = [                                                               # 同时准备“使用系统代理”和“禁用代理”两套 opener
+            urllib.request.build_opener(
+                urllib.request.ProxyHandler(),
+                urllib.request.HTTPSHandler(context=self.sslContext),
+                urllib.request.HTTPCookieProcessor(self.cookieJar),
+            ),
+            urllib.request.build_opener(
+                urllib.request.ProxyHandler({}),
+                urllib.request.HTTPSHandler(context=self.sslContext),
+                urllib.request.HTTPCookieProcessor(self.cookieJar),
+            ),
+        ]
 
     # ==================== 算子层 ====================
 
@@ -118,8 +125,20 @@ class TempMail:
             headers=self.buildHeaders(email=email),                                    # 带上浏览器头和可能的 token
             method="GET",
         )
-        with self.opener.open(request, timeout=20) as response:                        # 发送请求
-            return response.read().decode("utf-8", errors="ignore")                    # 读取并解码为字符串
+
+        lastError = None                                                               # 记录最后一次请求异常，便于最终抛出
+        for opener in self.openers:                                                    # 依次尝试系统代理和禁用代理两条路径
+            try:
+                with opener.open(request, timeout=20) as response:
+                    return response.read().decode("utf-8", errors="ignore")
+            except Exception as error:
+                lastError = error
+                continue
+
+        if lastError:
+            raise lastError
+
+        raise RuntimeError("requestHtml failed")                                      # 理论上不会走到这里，保底抛错
 
     def bootstrapBrowserSession(self):                                                 # 访问首页并提取浏览器会话认证信息
         html = self.requestHtml("/")                                                   # 请求首页 HTML
@@ -158,18 +177,27 @@ class TempMail:
             method=method,                                                             # GET / POST
         )
 
-        try:
-            with self.opener.open(request, timeout=20) as response:                    # 发送请求并等待响应
-                text = response.read().decode("utf-8", errors="ignore")                # 读取响应文本
-        except urllib.error.HTTPError as error:                                        # 把 HTTP 错误展开为更清晰的信息
-            text = ""
-            try: text = error.read().decode("utf-8", errors="ignore")                  # 读取错误响应体帮助定位问题
-            except Exception: pass
-            raise RuntimeError(f"HTTP {error.code} {path} {text[:300]}")               # 抛出带路径和错误片段的异常
+        lastError = None                                                               # 保存最后一次失败原因，避免静默返回空
+        for opener in self.openers:                                                    # 先走系统代理，再走禁用代理兜底
+            try:
+                with opener.open(request, timeout=20) as response:
+                    text = response.read().decode("utf-8", errors="ignore")
+                    data = json.loads(text)
+                    self.extractAuth(data)
+                    return data
+            except urllib.error.HTTPError as error:
+                text = ""
+                try: text = error.read().decode("utf-8", errors="ignore")
+                except Exception: pass
+                raise RuntimeError(f"HTTP {error.code} {path} {text[:300]}")
+            except Exception as error:
+                lastError = error
+                continue
 
-        data = json.loads(text)                                                        # 把响应文本解析为 JSON 字典
-        self.extractAuth(data)                                                         # 如果响应里带了新的 auth，就顺手更新本地状态
-        return data                                                                    # 返回解析后的 JSON 对象
+        if lastError:
+            raise lastError
+
+        raise RuntimeError(f"sendRequest failed: {path}")                             # 保底抛错，避免上层误判成“没有新邮件”
 
     def issueInboxToken(self, email):                                                  # 为某个邮箱签发或刷新 x-inbox-token
         if not email: return None                                                      # 没有邮箱时无法签发 token
@@ -287,7 +315,8 @@ class TempMail:
         if not self.email: return []                                                   # 没有邮箱时直接返回空列表
 
         try: messageList = self.fetchEmailList(self.email)                             # 拉取当前邮箱完整邮件列表
-        except Exception: return []                                                    # 请求失败返回空不中断流程
+        except Exception as error:
+            raise RuntimeError(f"getInbox failed: {error}")                           # 不再静默吃掉异常，避免把请求失败误判成“没有新邮件”
 
         normalizedList = []                                                            # 用于收集标准化后的邮件列表
         for item in messageList:                                                       # 遍历原始邮件
@@ -321,9 +350,30 @@ class TempMail:
 
     def waitNewMail(self, timeoutSeconds=60, pollSeconds=2):                           # 等待一封新邮件到达
         startTime = time.time()                                                        # 记录开始时间
+        seenBodySet = set()                                                            # 记录已经看过的正文，兼容有些服务端不稳定返回 mail id
+
         while time.time() - startTime < timeoutSeconds:                                # 在超时时间内循环
-            freshList = self.getInbox()                                                # 检查有没有新邮件
+            freshList = self.getInbox()                                                # 优先走基于基线的新邮件检测
             if freshList: return freshList[0]                                          # 有新邮件就返回第一封
+
+            allMailList = self.listAll()                                               # 如果新邮件检测没命中，再回退到全量轮询
+            for item in allMailList:
+                mailId = str(item.get("mailID", ""))
+                bodyText = str(item.get("body", ""))
+
+                if mailId and mailId in self.baselineIds:
+                    continue
+
+                if bodyText and bodyText in seenBodySet:
+                    continue
+
+                if bodyText:
+                    seenBodySet.add(bodyText)
+
+                if mailId:
+                    self.mailMap[mailId] = item
+                    return item
+
             time.sleep(pollSeconds)                                                    # 没有就等待后继续轮询
         return None                                                                    # 超时了返回空
 

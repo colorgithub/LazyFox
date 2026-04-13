@@ -13,6 +13,7 @@
 
 from pathlib import Path
 import json
+import re
 import time
 
 from TempMail.gptmail import TempMail
@@ -179,15 +180,62 @@ class DeepSeekRegister:
 
         logger.info("发送验证码按钮点击完成。")
 
+    def extractVerifyCode(self, text):
+        logger.info("正在从邮件内容中手动提取验证码。")
+
+        if not text:
+            logger.warning("邮件内容为空，无法提取验证码。")
+            return ""
+
+        codePatternList = [
+            r"verification code[^\d]{0,40}(\d{6})",
+            r"code below[^\d]{0,40}(\d{6})",
+            r"DeepSeek[^\d]{0,80}(\d{6})",
+            r">\s*(\d{6})\s*<",
+            r"\b(\d{6})\b",
+        ]
+
+        for codePattern in codePatternList:
+            match = re.search(codePattern, text, re.IGNORECASE | re.DOTALL)
+
+            if not match:
+                continue
+
+            code = match.group(1)
+            logger.info(f"验证码提取成功: {code}")
+            return code
+
+        logger.warning("邮件内容里没有提取到验证码。")
+        return ""
+
     def waitVerifyCode(self, mail):
         logger.info("正在等待邮箱验证码。")
-        code = mail.getCode(timeoutSeconds=60, pollSeconds=2)
+        startTime = time.time()
+        timeoutSeconds = 120
+        pollSeconds = 2
 
-        if not code:
-            raise RuntimeError("邮箱验证码获取失败")
+        while time.time() - startTime < timeoutSeconds:
+            newMail = mail.waitNewMail(timeoutSeconds=pollSeconds, pollSeconds=1)
 
-        logger.info(f"邮箱验证码获取完成: {code}")
-        return code
+            if not newMail:
+                logger.info("暂时还没有新邮件，继续等待。")
+                continue
+
+            subjectText = str(newMail.get("subject", ""))
+            messageId = str(newMail.get("mailID", ""))
+            bodyText = mail.readMessage(messageId)
+            fullText = subjectText + "\n" + bodyText
+
+            logger.info(f"已收到新邮件，主题: {subjectText}")
+            code = self.extractVerifyCode(fullText)
+
+            if code:
+                logger.info(f"邮箱验证码获取完成: {code}")
+                return code
+
+            logger.warning("这封新邮件没有提取到验证码，继续等待下一封。")
+
+        raise RuntimeError("邮箱验证码获取失败，请检查临时邮箱服务或验证码邮件内容格式。")
 
     def submitRegisterForm(self, browser, code):
         logger.info("正在填写验证码并提交注册。")
