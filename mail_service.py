@@ -469,9 +469,36 @@ class MailService:
 if __name__ == "__main__":
     setup_logging()
     service = MailService()
-    _logger.info("正在测试申请临时邮箱...")
-    res = service.request_email()
-    if res.success:
-        _logger.info("申请成功: %s", res.email)
-    else:
-        _logger.error("申请失败: %s", res.error)
+    test_email = "ecoleman474@dcheduc.shop"
+
+    _logger.info("开始测试指定邮箱: %s", test_email)
+
+    try:
+        service.current_email = test_email
+        service._issue_inbox_token(test_email)
+
+        _logger.info("当前 current_email: %s", service.current_email)
+        _logger.info("当前 inbox_token 是否存在: %s", bool(service.inbox_token))
+        _logger.info("当前 Referer: %s", service._build_headers(email=test_email).get("Referer"))
+
+        emails = service._get_emails(test_email)
+        _logger.info("邮件列表数量: %s", len(emails))
+
+        for index, item in enumerate(emails[:5], start=1):
+            _logger.info("第 %s 封主题: %s", index, item.get("subject", ""))
+            _logger.info("第 %s 封时间: %s", index, item.get("date", item.get("created_at", item.get("createdAt", ""))))
+            _logger.info("第 %s 封发件人: %s", index, item.get("from", item.get("sender", "")))
+
+        latest_html = service._get_latest_email_html(test_email)
+        if latest_html:
+            _logger.info("最新邮件 HTML 前 1000 字符: %s", latest_html[:1000])
+        else:
+            _logger.warning("没有读取到最新邮件 HTML")
+
+        latest_text = service._get_latest_email_content(test_email)
+        if latest_text:
+            _logger.info("最新邮件文本前 500 字符: %s", latest_text[:500])
+        else:
+            _logger.warning("没有读取到最新邮件文本")
+    except Exception as error:
+        _logger.exception("测试指定邮箱失败: %s", error)
