@@ -1,5 +1,5 @@
 """
-这个文件负责把注册主流程串起来。
+这个文件仅仅是作为lazyfox的使用示例，deepseek注册机
 
 可直接调用的方法：
 - runRegisterFlow(accountCount=1)        # 连续注册多个账号
