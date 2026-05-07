@@ -40,6 +40,7 @@ class TempMail:
         self.domain = ""                                                              # 邮箱域名
         self.seenIds = set()                                                          # 已经读过的邮件编号集合
         self.baselineIds = set()                                                      # 为兼容原规范保留的基线集合
+        self.baselineReady = False                                                    # 是否已经完成首次收件箱基线初始化
         self.mailMap = {}                                                             # messageID 到邮件对象的映射
         self.mailQueue = []                                                           # SSE 到达后缓存的新邮件队列
         self.queueIds = set()                                                         # 队列中已存在的邮件编号集合
@@ -231,6 +232,7 @@ class TempMail:
         self.fetchMailbox()                                                           # 调用底层接口创建邮箱并写入对象状态
         self.seenIds = set()                                                          # 清空已读记录避免新邮箱被旧状态干扰
         self.baselineIds = set()                                                      # 清空基线集合让新邮箱从零开始
+        self.baselineReady = False                                                    # 新邮箱需要重新初始化基线
         self.mailMap = {}                                                             # 清空邮件映射缓存
         self.mailQueue = []                                                           # 清空新邮件队列
         self.queueIds = set()                                                         # 清空队列编号集合
@@ -261,10 +263,11 @@ class TempMail:
             if messageId: self.mailMap[messageId] = mail                              # 写入映射缓存
             normalizedList.append(mail)                                               # 收集到规范列表中
 
-        if not self.baselineIds:                                                      # 第一次调用时只建立基线
+        if not self.baselineReady:                                                    # 第一次调用时只建立基线
             for item in normalizedList:                                               # 遍历当前所有邮件
                 messageId = item.get("messageID", "")                                 # 取出邮件编号
                 if messageId: self.baselineIds.add(messageId)                         # 把现有邮件全部视为历史邮件
+            self.baselineReady = True                                                  # 即使首次列表为空，也要标记基线已初始化
             return []                                                                 # 首次调用不返回任何邮件
 
         skipIds = self.seenIds | self.baselineIds                                     # 合并已读和历史基线编号
@@ -305,7 +308,10 @@ class TempMail:
         startTime = time.time()                                                       # 记录开始时间
         while time.time() - startTime < timeoutSeconds:                               # 在总超时时间内循环等待
             remainSeconds = max(1, int(timeoutSeconds - (time.time() - startTime)))   # 计算本轮还能等待多久
-            event = self.streamOneEvent(timeoutSeconds=remainSeconds)                 # 开一次 SSE 等待新邮件事件
+            try:
+                event = self.streamOneEvent(timeoutSeconds=remainSeconds)             # 开一次 SSE 等待新邮件事件
+            except (httpx.TimeoutException, httpx.RequestError):
+                event = None                                                          # 流式连接超时或网络异常时按本轮未等到处理
             if not event:                                                             # 没等到有效事件则稍后继续
                 time.sleep(min(pollSeconds, 1))                                       # 短暂休眠后准备重连
                 continue
@@ -391,6 +397,7 @@ class TempMail:
     def clearMarks(self):                                                             # 清空所有已读和基线标记
         self.seenIds = set()                                                          # 重置已读集合
         self.baselineIds = set()                                                      # 重置基线集合
+        self.baselineReady = False                                                    # 下次查询重新建立基线
 
     def close(self):                                                                  # 关闭客户端释放网络资源
         self.client.close()                                                           # 关闭底层连接池

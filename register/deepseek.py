@@ -8,7 +8,7 @@
 实现约束：
 - 身份数据统一来自 tools/identity.py
 - 浏览器动作统一来自 tools/browser.py
-- 临时邮箱统一来自 TempMail/gptmail.py
+- 临时邮箱统一来自 TempMail/m2u.py
 """
 import sys
 from pathlib import Path
@@ -29,7 +29,7 @@ import json
 import re
 import time
 
-from TempMail.gptmail import TempMail
+from TempMail.m2u import TempMail
 from tools.browser import Browser
 from tools.identity import Identity
 from tools.log import Log
@@ -37,6 +37,11 @@ from tools.log import Log
 SIGN_UP_URL = "https://chat.deepseek.com/sign_up"
 REGISTER_API_URL = "https://chat.deepseek.com/api/v0/users/register"
 ACCOUNTS_FILE = Path("accounts.json")
+PAGE_READY_TEXT = "deepseek"
+PAGE_READY_RETRY_COUNT = 10
+PAGE_READY_WAIT_SECONDS = 10
+BLOCKED_EMAIL_DOMAIN = "@kkb.qzz.io"
+TEMP_EMAIL_RETRY_COUNT = 10
 
 EMAIL_INPUT = [
     "div.ds-form-item:nth-child(2) > div:nth-child(1) > div:nth-child(1) > input:nth-child(1)",
@@ -137,6 +142,25 @@ class DeepSeekRegister:
         logger.error(message)
         raise SystemExit(message)
 
+    def waitDeepSeekPageReady(self, browser):
+        logger.info("正在检查注册页面是否包含 deepseek 文本。")
+
+        for attempt in range(PAGE_READY_RETRY_COUNT + 1):
+            bodyText = browser.getText("body", timeout=2000, defaultValue="")
+
+            if PAGE_READY_TEXT in bodyText.lower():
+                logger.info("注册页面已检测到 deepseek 文本。")
+                return
+
+            if attempt >= PAGE_READY_RETRY_COUNT:
+                break
+
+            logger.warning(f"注册页面未检测到 deepseek 文本，刷新重试 {attempt + 1}/{PAGE_READY_RETRY_COUNT}。")
+            browser.reload(timeout=10000)
+            browser.sleep(PAGE_READY_WAIT_SECONDS)
+
+        raise RuntimeError("注册页面多次刷新后仍未检测到 deepseek 文本")
+
     def openRegisterPage(self, browser):
         logger.info("正在打开注册页面。")
         isOpened = browser.goto(
@@ -148,6 +172,7 @@ class DeepSeekRegister:
         if not isOpened:
             raise RuntimeError("注册页面打开失败")
 
+        self.waitDeepSeekPageReady(browser)
         self.checkPhoneNumberMode(browser)
 
         if not browser.show(EMAIL_INPUT, timeout=3000):
@@ -157,14 +182,23 @@ class DeepSeekRegister:
 
     def makeTempEmail(self, mail):
         logger.info("正在生成临时邮箱。")
-        email = mail.generateEmail()
-        mail.getInbox()
 
-        if not email:
-            raise RuntimeError("临时邮箱生成失败")
+        for attempt in range(TEMP_EMAIL_RETRY_COUNT):
+            email = mail.generateEmail()
+            mail.getInbox()
 
-        logger.info(f"临时邮箱生成完成: {email}")
-        return email
+            if not email:
+                logger.warning(f"临时邮箱生成为空，重新生成 {attempt + 1}/{TEMP_EMAIL_RETRY_COUNT}。")
+                continue
+
+            if email.lower().endswith(BLOCKED_EMAIL_DOMAIN):
+                logger.warning(f"临时邮箱命中禁用域名，重新生成 {attempt + 1}/{TEMP_EMAIL_RETRY_COUNT}: {email}")
+                continue
+
+            logger.info(f"临时邮箱生成完成: {email}")
+            return email
+
+        raise RuntimeError("临时邮箱生成失败或连续命中禁用域名")
 
     def fillRegisterForm(self, browser, accountData):
         logger.info("正在填写注册表单。")
@@ -225,7 +259,7 @@ class DeepSeekRegister:
             return ""
 
         subjectText = str(mailItem.get("subject", ""))
-        messageId = str(mailItem.get("mailID", ""))
+        messageId = str(mailItem.get("messageID") or mailItem.get("mailID") or "")
         bodyText = mail.readMessage(messageId)
         fullText = subjectText + "\n" + bodyText
 
@@ -235,17 +269,28 @@ class DeepSeekRegister:
     def waitVerifyCode(self, mail):
         logger.info("正在等待邮箱验证码。")
         startTime = time.time()
-        timeoutSeconds = 120
+        timeoutSeconds = 80
         pollSeconds = 2
         latestMailFingerprint = ""
 
         while time.time() - startTime < timeoutSeconds:
-            latestMail = mail.getLatestMail()
+            mailList = mail.getInbox()
+            if not mailList and hasattr(mail, "waitNewMail"):
+                try:
+                    latestMail = mail.waitNewMail(timeoutSeconds=pollSeconds, pollSeconds=1)
+                except Exception as error:
+                    logger.warning(f"等待邮箱新邮件时出现网络异常，继续轮询: {error}")
+                    latestMail = None
+                mailList = [latestMail] if latestMail else []
 
-            if latestMail:
-                latestFingerprint = str(latestMail.get("mailID", ""))
+            if mailList:
+                for latestMail in mailList:
+                    latestFingerprint = str(latestMail.get("messageID") or latestMail.get("mailID") or "")
 
-                if latestFingerprint != latestMailFingerprint:
+                    if latestFingerprint == latestMailFingerprint:
+                        logger.info("最新邮件和上一轮相同，继续等待新验证码邮件。")
+                        continue
+
                     latestMailFingerprint = latestFingerprint
                     code = self.readVerifyCodeFromMail(latestMail, mail)
 
@@ -254,8 +299,6 @@ class DeepSeekRegister:
                         return code
 
                     logger.warning("最新邮件存在，但暂时没有提取到验证码，继续等待。")
-                else:
-                    logger.info("最新邮件和上一轮相同，继续等待新验证码邮件。")
             else:
                 logger.info("暂时还没有读取到任何邮件，继续等待。")
 
@@ -393,7 +436,7 @@ class DeepSeekRegister:
 
             with Browser(
                 engine="camoufox",
-                headless=True,
+                headless=False,
                 os="windows",
                 geoip=True,
                 humanize=False,
